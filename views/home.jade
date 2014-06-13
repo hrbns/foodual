@@ -1,0 +1,38 @@
+extends layout
+
+block content
+  if !user
+    - permissionLevel = 0
+  if user
+    - permissionLevel = 1
+  if user.activated
+    - permissionLevel = 2
+  case permissionLevel
+    when 1 
+      h1 Please activate your account
+    when 2
+      h1 Foodual
+      -for (var i = 0; i < user.factualKeys.length; i++)
+        li=user.factualKeys[i]
+      form(method='POST', id='addkey_form')
+         input(type='hidden', name='_csrf', value=_csrf)
+         legend Add key
+         .col-sm-8.col-sm-offset-2
+           .form-group
+             label.control-label(for='key') API key
+             input.form-control(type='text', name='key', id='key', placeholder='Key', autofocus=true)
+           .form-group
+             label.control-label(for='secret') Secret
+             input.form-control(type='text', name='secret', id='secret', placeholder='Secret', autofocus=true)
+           .form-group
+             .col-sm-offset-3.col-sm-7
+               button.btn.btn-success(id='addKey')
+                 i.fa.fa-check
+                 | Add Key
+
+    default 
+      h1 Please register or login to view this application
+      p.lead
+        | Use this document as a way to quickly start any new project.
+        br
+        | All you get is this text and a mostly barebones HTML document.
