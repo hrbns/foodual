@@ -1,4 +1,3 @@
-var FactualKey = require('../models/FactualKey');
 var User = require('../models/User');
 
 /**
@@ -24,9 +23,24 @@ exports.postAddKey = function(req, res, next) {
     function(err, user) {
         if (err) return next(err);
     });
-    //user.save(function(err) {
-      //if (err) return next(err);
-      //req.flash('success', { msg: 'Added key.' });
-      //res.redirect('/');
-    //});
+  res.contentType('json');
+  res.send(req.body);
+  //user.save(function(err) {
+    //if (err) return next(err);
+    //req.flash('success', { msg: 'Added key.' });
+    //res.redirect('/');
+  //});
+}
+
+/**
+ * POST /keys/delete
+ * Remove key.
+ */
+exports.postDeleteKey = function(req, res, next) {
+  User.findByIdAndUpdate(req.user.id, 
+    {$unset: {"factualKeys": {"key": req.body.key}}},
+    {safe: true, upsert: true},
+    function(err, user) {
+        if (err) return next(err);
+    });
 }
