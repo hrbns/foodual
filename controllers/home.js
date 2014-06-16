@@ -17,30 +17,45 @@ exports.index = function(req, res) {
  */
 exports.postAddKey = function(req, res, next) {
   console.log(req.body.key);
-  User.findByIdAndUpdate(req.user.id, 
+  addKey = function() {
+    User.findByIdAndUpdate(req.user.id, 
     {$push: {"factualKeys": {"key": req.body.key, "secret": req.body.secret}}},
-    {safe: true, upsert: true},
     function(err, user) {
-        if (err) return next(err);
+        if (err){
+          console.log(err.code);
+          return next(err);
+        }
     });
-  res.contentType('json');
-  res.send(req.body);
-  //user.save(function(err) {
-    //if (err) return next(err);
-    //req.flash('success', { msg: 'Added key.' });
-    //res.redirect('/');
-  //});
+    res.contentType('json');
+    res.send(req.body);
+  };
+  User.findById(req.user.id, function(err, user) {
+    for (var i = 0; i < user.factualKeys.length; i++) {
+      if (user.factualKeys[i].key == req.body.key) {
+        return res.status('500').send('Duplicate key');
+      }
+    }
+    if (err) return next(err);
+    addKey();
+  });     
 }
 
 /**
- * POST /keys/delete
+ * GET /keys/remove/:keyId
  * Remove key.
  */
-exports.postDeleteKey = function(req, res, next) {
+exports.getRemoveKey = function(req, res, next) {
+  var keyId = req.params.keyId;
+  console.log(keyId);
   User.findByIdAndUpdate(req.user.id, 
-    {$unset: {"factualKeys": {"key": req.body.key}}},
-    {safe: true, upsert: true},
+    {$pull: { factualKeys: {key: keyId}}},
     function(err, user) {
-        if (err) return next(err);
+      if (err) { 
+        console.log(err.code);
+        res.send(err.code);
+        return next(err);
+      }
     });
+  res.contentType('json');
+  res.send("Key: " + keyId + " deleted");
 }

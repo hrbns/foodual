@@ -29,7 +29,7 @@ var userSchema = new mongoose.Schema({
   
   activationToken: String,
   factualKeys: [{ 
-    key: String,
+    key: { type: String, unique: true },
     secret: String
   }]
 });

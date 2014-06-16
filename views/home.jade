@@ -12,12 +12,16 @@ block content
       h1 Please activate your account
     when 2
       .left-sidebar
-        .keys.list-group
+        .keys.list-group.container
           -for (var i = 0; i < user.factualKeys.length; i++)
-            .input-group
-              a.list-group-item(href="#")=user.factualKeys[i].key
+            - var inputGroupId = "inputGroup" + i
+            - var listItemId = "listItem" + i
+            - var buttonItemId = "buttonItem" + i
+            - var crsfItemId = "crsfItem" + i
+            .input-group.col-sm-2(id=inputGroupId)
+              a.list-group-item(href="#", id=listItemId)=user.factualKeys[i].key
               span.input-group-btn
-                button.btn.btn-danger(type="button") - 
+                button.btn.btn-danger(type="button", id=buttonItemId) -
         form.panel.panel-default(method='POST', id='addkey_form')
           .panel-heading
              input(type='hidden', name='_csrf', value=_csrf)
