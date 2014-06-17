@@ -30,7 +30,8 @@ var userSchema = new mongoose.Schema({
   activationToken: String,
   factualKeys: [{ 
     key: { type: String, unique: true },
-    secret: String
+    secret: String,
+    daily: String
   }]
 });
 
