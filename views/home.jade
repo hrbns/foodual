@@ -20,7 +20,8 @@ block content
                 - var buttonItemId = "buttonItem" + i
                 - var crsfItemId = "crsfItem" + i
                 .input-group.col-sm-2(id=inputGroupId)
-                  a.list-group-item(href="#", id=listItemId)=user.factualKeys[i].key
+                  - var itemText = '(' + user.factualKeys[i].daily + ') ' + user.factualKeys[i].key 
+                  a.list-group-item(href="#", id=listItemId)=itemText
                   span.input-group-btn
                     button.btn.btn-danger(type="button", id=buttonItemId) -
             form.panel.panel-default(method='POST', id='addkey_form')
@@ -32,10 +33,25 @@ block content
                  button.btn.btn-success(type='submit', id='addKey', data-loading-text='Loading')
                    i.fa.fa-check
                    | Add Key
-
+        .col-md-8
+          .col-sm-2
+            button.btn.btn-success(type="button", id="initJob", data-loading-text='Processing') Start
+          span.label.label-default Query Count
+          .queryLimit.btn-group(data-toggle="buttons")
+            label.btn.btn-primary 500
+              input(type="radio", name="options" id="option1")
+            label.btn.btn-primary 1000
+              input(type="radio", name="options" id="option1")
+            label.btn.btn-primary 2500
+              input(type="radio", name="options" id="option1")
+            label.btn.btn-primary 5000
+              input(type="radio", name="options" id="option1")
+            label.btn.btn-primary 10000
+              input(type="radio", name="options" id="option1")
+        .col-md-8
+          br
+          .progress
+            .progress-bar(role='progressbar', aria-valuenow='0', aria-valuemin='0', aria-valuemax='100', style='width: 0%;') 0%
+        div(id="map-canvas")
       default 
         h1 Please register or login to view this application
-    .col-md-8
-      .progress
-        .progress-bar(role='progressbar', aria-valuenow='0', aria-valuemin='0', aria-valuemax='100', style='width: 0%;') 0%
-    div(id="map-canvas")

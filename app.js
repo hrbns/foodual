@@ -144,8 +144,9 @@ app.post('/account/delete', passportConf.isAuthenticated, userController.postDel
 app.get('/account/unlink/:provider', passportConf.isAuthenticated, userController.getOauthUnlink);
 app.get('/activate/:token', userController.getActivate);
 
-app.post('/keys/add', homeController.postAddKey);
-app.get('/keys/remove/:keyId', homeController.getRemoveKey);
+app.post('/keys/add', homeController.addKey);
+app.get('/keys/remove/:keyId', homeController.removeKey);
+app.post('/job/run', homeController.runJob);
 
 /**
  * API examples routes.

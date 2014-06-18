@@ -32,7 +32,8 @@ var userSchema = new mongoose.Schema({
     key: { type: String, unique: true },
     secret: String,
     daily: String
-  }]
+  }],
+  jobs: Array
 });
 
 /**

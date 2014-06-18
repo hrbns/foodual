@@ -1,7 +1,8 @@
 var _ = require('lodash');
 var User = require('../models/User');
-var request = require('request');
+var Job = require('../models/Job');
 var Factual = require('factual-api');
+var where = require('where')
 
 /**
  * GET /
@@ -18,7 +19,8 @@ exports.index = function(req, res) {
  * POST /keys/add
  * Add key.
  */
-exports.postAddKey = function(req, res, next) {
+exports.addKey = function(req, res, next) {
+  // executed only after key is validated
   addKey = function() {
     User.findByIdAndUpdate(req.user.id, 
     {$push: {"factualKeys": {"key": req.body.key, "secret": req.body.secret}}},
@@ -41,17 +43,32 @@ exports.postAddKey = function(req, res, next) {
       });
     });
   };
-  User.findById(req.user.id, function(err, user) {
+  validateKey = function (err, user, callback) {
+    var keyIndex = _.findIndex(user.factualKeys, function(factKey){
+      return factKey.key == req.body.key;
+    });
+    // handling various errors 
     if (!req.body.key) {
-      return res.status('411').send('Empty key');
+      var messages =  { messages: { errors: { error: { msg: "Empty key!" }}}};
+      return res.render('partials/flash', messages, function(err, html) {
+        res.status(411).send({flash: html});
+      });
     }
-    for (var i = 0; i < user.factualKeys.length; i++) {
-      if (user.factualKeys[i].key == req.body.key) {
-        return res.status('409').send('Duplicate key');
-      }
+    if (keyIndex != -1) {
+      var messages =  { messages: { errors: { error: { msg: "Duplicate key!" }}}};
+      return res.render('partials/flash', messages, function(err, html) {
+        res.status('409').send({ flash: html }); 
+      });
     }
+    // if no errors add the key
+    callback();
+  }
+
+  User.findById(req.user.id, function(err, user) {
     if (err) return next(err);
-    addKey();
+    validateKey(err, user, function() {
+      addKey();
+    });
   });     
 }
 
@@ -59,7 +76,7 @@ exports.postAddKey = function(req, res, next) {
  * GET /keys/remove/:keyId
  * Remove key.
  */
-exports.getRemoveKey = function(req, res, next) {
+exports.removeKey = function(req, res, next) {
   var keyId = req.params.keyId;
   User.findByIdAndUpdate(req.user.id, 
     {$pull: { factualKeys: {key: keyId}}},
@@ -71,4 +88,80 @@ exports.getRemoveKey = function(req, res, next) {
     });
   res.contentType('json');
   res.send("Key: " + keyId + " deleted");
+}
+
+/**
+ * POST /job/run
+ * Run factual job
+ */
+exports.runJob = function(req, res, next) {
+  User.findById(req.user.id, function(err, user) {
+    var job = new Job();
+    if (!req.body.key) {
+      var messages =  { messages: { errors: { error: { msg: "Empty key!" }}}};
+      return res.render('partials/flash', messages, function(err, html) {
+        res.status(411).send({flash: html});
+      });
+    }
+    var keyIndex = _.findIndex(user.factualKeys, function(factKey){
+      return factKey.key == req.body.key;
+    });
+    var queriesLeft;
+    if (req.body.queryLimit) {
+      queriesLeft = req.body.queryLimit;
+    } else {
+      queriesLeft = (1 - (parseInt(user.factualKeys[keyIndex].daily.replace('%', '')) * 0.01)) * 10000;
+    }
+    var secret = user.factualKeys[keyIndex].secret;
+    var factual = new Factual(req.body.key, secret);
+    var step = (req.body.bounds.se.lon - req.body.bounds.nw.lon) / queriesLeft;
+    var nw = { lat: req.body.bounds.nw.lat, lon: req.body.bounds.nw.lon };
+    var se = { lat: req.body.bounds.se.lat, lon: req.body.bounds.nw.lon + step };
+    var queryCount = queriesLeft;
+    var dailyLimit;
+    interval = setInterval(function() {
+      for (var i = 0; i < 500; i++) {
+        
+        factual.get('/t/restaurants', {geo:{"$rect":[[ nw.lat, nw.lon], [se.lat, se.lon]]}}, function (error, res, respObject) {
+          job.data.push(res.data);
+          dailyLimit = respObject.headers['x-factual-throttle-allocation'].daily;
+        });
+        nw.lon = se.lon;
+        se.lon += step;
+        queriesLeft--;
+      }
+      job.progress = Math.round((queriesLeft/queryCount)*100); 
+      job.save();
+      user.factualKeys[keyIndex].daily = dailyLimit;
+      user.save();
+    }, 61000);
+    if (nw.lon <= se.lon || queriesLeft == 0) {
+      clearInterval(interval);
+      user.jobs.push(job);
+      user.save();
+      return res.send("Job complete!");
+    }
+    if (err) return next(err);
+  });
+}
+
+/**
+ * POST /job/progress
+ * Return progress update
+ */
+exports.progressUpdate = function (req, res, next) {
+  User.findById(req.user.id, function(err, user) {
+    if (err) return next(err);
+    var keyIndex = _.findIndex(user.factualKeys, function(factKey){
+      return factKey.key == req.body.key;
+    });
+    var jobIndex = _.findIndex(user.factualKeys[keyIndex].jobs, function(job) {
+      return job.key == req.body.key;
+    }); 
+    
+    return res.send({ 
+      progress: user.factualKeys[keyIndex].jobs[jobIndex].progress,
+      daily: user.factualKeys[keyIndex].daily 
+    });
+  });     
 }
