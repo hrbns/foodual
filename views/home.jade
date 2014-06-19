@@ -20,8 +20,11 @@ block content
                 - var buttonItemId = "buttonItem" + i
                 - var crsfItemId = "crsfItem" + i
                 .input-group.col-sm-2(id=inputGroupId)
-                  - var itemText = '(' + user.factualKeys[i].daily + ') ' + user.factualKeys[i].key 
-                  a.list-group-item(href="#", id=listItemId)=itemText
+                  - var daily = '(' + user.factualKeys[i].daily + ') '
+                  - var itemText =  + user.factualKeys[i].key 
+                  a.list-group-item(href="#", id=listItemId)
+                    span #{daily}
+                    | #{user.factualKeys[i].key}
                   span.input-group-btn
                     button.btn.btn-danger(type="button", id=buttonItemId) -
             form.panel.panel-default(method='POST', id='addkey_form')

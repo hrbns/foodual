@@ -96,50 +96,65 @@ exports.removeKey = function(req, res, next) {
  */
 exports.runJob = function(req, res, next) {
   User.findById(req.user.id, function(err, user) {
-    var job = new Job();
     if (!req.body.key) {
       var messages =  { messages: { errors: { error: { msg: "Empty key!" }}}};
       return res.render('partials/flash', messages, function(err, html) {
         res.status(411).send({flash: html});
       });
     }
+    if (!req.body.bounds) {
+      var messages =  { messages: { errors: { error: { msg: "No bounds given!" }}}};
+      return res.render('partials/flash', messages, function(err, html) {
+        res.status('409').send({flash: html});
+      });
+    }
+    var job = new Job();
+    job.key = req.body.key;
+    job.progress = 0;
+    user.jobs.push(job);
+    user.save();
+    console.log(req.body);
     var keyIndex = _.findIndex(user.factualKeys, function(factKey){
       return factKey.key == req.body.key;
     });
+    var jobIndex = _.findIndex(user.jobs, function(job){
+      return job.key == req.body.key;
+    });
     var queriesLeft;
     if (req.body.queryLimit) {
-      queriesLeft = req.body.queryLimit;
+      queriesLeft = parseInt(req.body.queryLimit);
     } else {
       queriesLeft = (1 - (parseInt(user.factualKeys[keyIndex].daily.replace('%', '')) * 0.01)) * 10000;
     }
     var secret = user.factualKeys[keyIndex].secret;
     var factual = new Factual(req.body.key, secret);
-    var step = (req.body.bounds.se.lon - req.body.bounds.nw.lon) / queriesLeft;
-    var nw = { lat: req.body.bounds.nw.lat, lon: req.body.bounds.nw.lon };
-    var se = { lat: req.body.bounds.se.lat, lon: req.body.bounds.nw.lon + step };
+    var step = (parseFloat(req.body.bounds.se.lon) - parseFloat(req.body.bounds.nw.lon)) / queriesLeft;
+    console.log(step);
+    console.log(req.body.bounds);
+    var nw = { lat: parseFloat(req.body.bounds.nw.lat), lon: parseFloat(req.body.bounds.nw.lon) };
+    var se = { lat: parseFloat(req.body.bounds.se.lat), lon: parseFloat(req.body.bounds.nw.lon + step) };
+    queriesLeft = 5;
     var queryCount = queriesLeft;
-    var dailyLimit;
-    interval = setInterval(function() {
-      for (var i = 0; i < 500; i++) {
-        
-        factual.get('/t/restaurants', {geo:{"$rect":[[ nw.lat, nw.lon], [se.lat, se.lon]]}}, function (error, res, respObject) {
-          job.data.push(res.data);
-          dailyLimit = respObject.headers['x-factual-throttle-allocation'].daily;
-        });
+    console.log('query count: ' + queryCount);
+    var dailyLimit = '0%';
+    for (var i = 0; i < 5; i++) {
+      factual.get('/t/restaurants-us', {geo:{"$within": {"$rect":[[ nw.lat, nw.lon], [se.lat, se.lon]]}}}, function (error, res, respObject) {
         nw.lon = se.lon;
         se.lon += step;
+        job.data.push(res.data);
+        dailyLimit = respObject.headers['x-factual-throttle-allocation'].daily;
         queriesLeft--;
+        job.progress = 100 - (Math.round((queriesLeft/queryCount)*100));
+        job.save();
+        user.factualKeys[keyIndex].daily = dailyLimit;
+        user.save();
+        console.log( ' queriesLeft: ' + queriesLeft + '   queryCount: ' + queryCount);
+        console.log(' progress: ' + user.jobs[jobIndex].progress);
+      });
+      if (se.lon >= req.body.bounds.se.lon || queriesLeft == 0) {
+        user.save();
+        return res.send("Job complete!");
       }
-      job.progress = Math.round((queriesLeft/queryCount)*100); 
-      job.save();
-      user.factualKeys[keyIndex].daily = dailyLimit;
-      user.save();
-    }, 61000);
-    if (nw.lon <= se.lon || queriesLeft == 0) {
-      clearInterval(interval);
-      user.jobs.push(job);
-      user.save();
-      return res.send("Job complete!");
     }
     if (err) return next(err);
   });
@@ -155,12 +170,16 @@ exports.progressUpdate = function (req, res, next) {
     var keyIndex = _.findIndex(user.factualKeys, function(factKey){
       return factKey.key == req.body.key;
     });
-    var jobIndex = _.findIndex(user.factualKeys[keyIndex].jobs, function(job) {
+    var jobIndex = _.findIndex(user.jobs, function(job) {
       return job.key == req.body.key;
     }); 
-    
+    var progress = 0; 
+    if (jobIndex != -1) {
+      progress = user.jobs[jobIndex].progress;
+    }
+    console.log(user.factualKeys[keyIndex].daily);
     return res.send({ 
-      progress: user.factualKeys[keyIndex].jobs[jobIndex].progress,
+      progress: progress,
       daily: user.factualKeys[keyIndex].daily 
     });
   });     

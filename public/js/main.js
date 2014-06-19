@@ -25,7 +25,7 @@ $(document).ready(function() {
       $.post('/keys/add', $('#addkey_form').serialize(), function(data, status) {
         var inputGroupHTML = '<div id="' + inputGroupId + '" class="input-group col-sm-2">' +
                    '<a href="#" id="' + listItemId + '" class="list-group-item ' + activeClass + '">' + 
-                    '(' + data.daily + ') ' + data.key + '</a>' +
+                    '<span>(' + data.daily + ') </span>' + data.key + '</a>' +
                    '<span class="input-group-btn">' +
                    '<button type="button" id="' + buttonItemId + '" class="btn btn-danger">-</button>' +
                    '</span>' +
@@ -57,8 +57,7 @@ $(document).ready(function() {
   $('.keys').on('click', '.input-group > span > button', function(e) {
       var listItemId = "#listItem" + $(e.target).attr("id").replace("buttonItem", "");
       var inputGroupId = "#inputGroup" + $(e.target).attr("id").replace("buttonItem", "");
-      var key = $(listItemId).text();
-      key = key.substring(key.indexOf(' ')+1);
+      var key = $('.input-group > a.active').clone().children().remove().end().text();
       $.ajax({
         type: "GET",
         url: "/keys/remove/" + key,
@@ -73,41 +72,61 @@ $(document).ready(function() {
       }
   });
 
+  $('#initJob').click(function() {
+    $('#initJob').button('loading');
+    initJob();
+    pollJob();
+    $('#initJob').button('reset');
+  }); 
+
   function updateProgressBar(val) {
-      //if (val <= 50) {
-        //$('.progress-bar').addClass('progress-bar-success');
-      //} else if (val <= 75) {
-        //$('.progress-bar').addClass('progress-bar-warning');
-      //} else {
-        //$('.progress-bar').addClass('progress-bar-danger');
-      //}
-      $('.progress-bar').css('width', val.toString() + "%");
-      $('.progress-bar').attr('aria-valuenow', val.toString());
-      $('.progress-bar').text(val.toString() + "%");
+    $('.progress-bar').css('width', val.toString() + "%");
+    $('.progress-bar').attr('aria-valuenow', val.toString());
+    $('.progress-bar').text(val.toString() + "%");
   }
 
   function initJob() {
-    var ne = mapRect.getBounds().getNorthEast();
-    var sw = mapRect.getBounds().getSouthWest();
-    
-    var bounds = { 
-      nw: { lat: sw.lat(), lon: ne.lon() },
-      se: { lat: ne.lat(), lon: sw.lon() }
+    if (mapRect.getMap() != null) {
+      var ne = mapRect.getBounds().getNorthEast();
+      var sw = mapRect.getBounds().getSouthWest();
+      
+      var bounds = { 
+        se: { lat: sw.lat(), lon: ne.lng() },
+        nw: { lat: ne.lat(), lon: sw.lng() }
+      }
     }
-    var key = $('.input-group > a.active').text();
-    key = key.substring(key.indexOf(' ')+1);
-    var queryLimit = $('.queryLimit > label > active').text();
-    $.post('/job/run', { bounds: bounds, key: key, queryLimit: queryLimit} , function(data) {
+    var key = $('.input-group > a.active').clone().children().remove().end().text();
+    var queryLimit = $('.queryLimit > label.active').text();
+    var _csrf = $('meta[name=csrf-token]').attr('content');
+    $.post('/job/run', { bounds: bounds, key: key, queryLimit: queryLimit, _csrf: _csrf } , function(data) {
       console.log("JOB finished!");
+    }).fail(function(data) {
+      var flashHTML = JSON.parse(data.responseText).flash;
+      console.log(data.resposneText);
+      $('body > .container').prepend(flashHTML);
     });
-    
+  }
+
+  function pollJob() {
+    var _csrf = $('meta[name=csrf-token]').attr('content');
+    var key = $('.input-group > a.active').clone().children().remove().end().text();
+    $.post('/job/progress', {key: key, _csrf: _csrf }, function(data) {
+        updateProgressBar(data.progress);
+        $('.input-group > a.active > span').text(data.daily);
+        setTimeout(function() {
+          if (data.progress >= 100) {
+            return;
+          }
+          pollJob();
+        }, 5000);
+    });
   }
 
   function initialize() {
     var mapOptions = {
       zoom: 11,
-      center: new google.maps.LatLng(56.9489, 24.1064),
-      mapTypeId: google.maps.MapTypeId.SATELLITE
+      center: new google.maps.LatLng(40.7127, -74.0059),
+      mapTypeId: google.maps.MapTypeId.ROADMAP
     };
 
     map = new google.maps.Map(document.getElementById('map-canvas'), mapOptions);
