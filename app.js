@@ -146,6 +146,7 @@ app.get('/activate/:token', userController.getActivate);
 
 app.post('/keys/add', homeController.addKey);
 app.get('/keys/remove/:keyId', homeController.removeKey);
+app.post('/job/init', homeController.initJob);
 app.post('/job/run', homeController.runJob);
 app.post('/job/progress', homeController.progressUpdate);
 

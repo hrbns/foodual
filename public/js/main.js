@@ -57,7 +57,7 @@ $(document).ready(function() {
   $('.keys').on('click', '.input-group > span > button', function(e) {
       var listItemId = "#listItem" + $(e.target).attr("id").replace("buttonItem", "");
       var inputGroupId = "#inputGroup" + $(e.target).attr("id").replace("buttonItem", "");
-      var key = $('.input-group > a.active').clone().children().remove().end().text();
+      var key = $(listItemId).clone().children().remove().end().text();
       $.ajax({
         type: "GET",
         url: "/keys/remove/" + key,
@@ -74,8 +74,9 @@ $(document).ready(function() {
 
   $('#initJob').click(function() {
     $('#initJob').button('loading');
-    initJob();
-    pollJob();
+    initJob(function(job_id){
+      runJob(job_id);
+    });
     $('#initJob').button('reset');
   }); 
 
@@ -85,7 +86,19 @@ $(document).ready(function() {
     $('.progress-bar').text(val.toString() + "%");
   }
 
-  function initJob() {
+  function initJob(callback) {
+    var _csrf = $('meta[name=csrf-token]').attr('content');
+    $.post('/job/init', { _csrf: _csrf }, function(data) {
+      console.log(data.job_id);
+      callback(data.job_id);
+    }).fail(function(data) {
+      var flashHTML = JSON.parse(data.responseText).flash;
+      console.log(data.resposneText);
+      $('body > .container').prepend(flashHTML);
+    });
+  }
+
+  function runJob(job_id) {
     if (mapRect.getMap() != null) {
       var ne = mapRect.getBounds().getNorthEast();
       var sw = mapRect.getBounds().getSouthWest();
@@ -98,26 +111,28 @@ $(document).ready(function() {
     var key = $('.input-group > a.active').clone().children().remove().end().text();
     var queryLimit = $('.queryLimit > label.active').text();
     var _csrf = $('meta[name=csrf-token]').attr('content');
-    $.post('/job/run', { bounds: bounds, key: key, queryLimit: queryLimit, _csrf: _csrf } , function(data) {
-      console.log("JOB finished!");
-    }).fail(function(data) {
+    $.post('/job/run', { bounds: bounds, key: key, queryLimit: queryLimit, job_id: job_id, _csrf: _csrf } , function(data) {
       var flashHTML = JSON.parse(data.responseText).flash;
       console.log(data.resposneText);
       $('body > .container').prepend(flashHTML);
+    }).fail(function(data){
+      var flashHTML = JSON.parse(data.responseText).flash;
+      console.log(data.resposneText);
+      $('body > .container').prepend(flashHTML);
+      return;
     });
+    pollJob(job_id);
   }
 
-  function pollJob() {
+  function pollJob(job_id) {
     var _csrf = $('meta[name=csrf-token]').attr('content');
-    var key = $('.input-group > a.active').clone().children().remove().end().text();
-    $.post('/job/progress', {key: key, _csrf: _csrf }, function(data) {
+    $.post('/job/progress', {_csrf: _csrf, job_id: job_id }, function(data) {
         updateProgressBar(data.progress);
-        $('.input-group > a.active > span').text(data.daily);
         setTimeout(function() {
-          if (data.progress >= 100) {
+          if ((data.progress >= 100) || (data.status == 'aborted')) {
             return;
           }
-          pollJob();
+          pollJob(job_id);
         }, 5000);
     });
   }
